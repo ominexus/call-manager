@@ -18,7 +18,6 @@ const h = {
   "Content-Type": "application/json",
   Prefer: "return=representation",
 };
-
 const db = async (method, path, body) => {
   const r = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
     method, headers: h,
@@ -33,16 +32,29 @@ const db = async (method, path, body) => {
   return txt ? JSON.parse(txt) : [];
 };
 
+// ── 반응형 훅 ─────────────────────────────────────────────────────────────
+const useIsMobile = () => {
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+  useEffect(() => {
+    const handler = () => setIsMobile(window.innerWidth < 768);
+    window.addEventListener("resize", handler);
+    return () => window.removeEventListener("resize", handler);
+  }, []);
+  return isMobile;
+};
+
 // ── 공통 스타일 ──────────────────────────────────────────────────────────
 const inputStyle = {
-  width: "100%", padding: "9px 13px",
+  width: "100%", padding: "10px 13px",
   border: "1.5px solid #e2e8f0", borderRadius: 8,
-  fontSize: 14, boxSizing: "border-box",
+  fontSize: 15, boxSizing: "border-box",
   outline: "none", fontFamily: "inherit",
 };
-const btnStyle = (v = "primary") => ({
-  padding: "8px 18px", border: "none", borderRadius: 8,
-  fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: "inherit",
+const btnStyle = (v = "primary", size = "md") => ({
+  padding: size === "sm" ? "6px 12px" : "9px 18px",
+  border: "none", borderRadius: 8,
+  fontSize: size === "sm" ? 13 : 14,
+  fontWeight: 600, cursor: "pointer", fontFamily: "inherit",
   background: v === "primary" ? "#0284c7" : v === "danger" ? "#ef4444" : v === "success" ? "#16a34a" : "#f1f5f9",
   color: v === "ghost" ? "#64748b" : "#fff",
   whiteSpace: "nowrap",
@@ -52,18 +64,20 @@ const btnStyle = (v = "primary") => ({
 function Modal({ title, onClose, children }) {
   return (
     <div style={{
-      position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)",
-      display: "flex", alignItems: "center", justifyContent: "center",
+      position: "fixed", inset: 0, background: "rgba(0,0,0,0.55)",
+      display: "flex", alignItems: "flex-end", justifyContent: "center",
       zIndex: 1000, fontFamily: "inherit",
-    }}>
+    }} onClick={e => e.target === e.currentTarget && onClose()}>
       <div style={{
-        background: "#fff", borderRadius: 16, padding: 32,
-        width: "90%", maxWidth: 500, maxHeight: "85vh", overflowY: "auto",
-        boxShadow: "0 20px 60px rgba(0,0,0,0.3)",
+        background: "#fff", borderRadius: "20px 20px 0 0", padding: "24px 20px 32px",
+        width: "100%", maxWidth: 560, maxHeight: "90vh", overflowY: "auto",
+        boxShadow: "0 -8px 40px rgba(0,0,0,0.2)",
+        animation: "slideUp 0.2s ease",
       }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
-          <h3 style={{ fontSize: 18, fontWeight: 700, color: "#0f172a", margin: 0 }}>{title}</h3>
-          <button onClick={onClose} style={{ background: "none", border: "none", fontSize: 22, cursor: "pointer", color: "#94a3b8", lineHeight: 1 }}>×</button>
+        <div style={{ width: 40, height: 4, background: "#e2e8f0", borderRadius: 99, margin: "0 auto 20px" }} />
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
+          <h3 style={{ fontSize: 17, fontWeight: 700, color: "#0f172a", margin: 0 }}>{title}</h3>
+          <button onClick={onClose} style={{ background: "none", border: "none", fontSize: 22, cursor: "pointer", color: "#94a3b8" }}>×</button>
         </div>
         {children}
       </div>
@@ -93,18 +107,23 @@ function Badge({ answered }) {
   );
 }
 
-function EmptyRow({ cols, text = "등록된 데이터가 없습니다." }) {
+// ── 카드 컴포넌트 (모바일 목록용) ────────────────────────────────────────
+function Card({ children, style }) {
   return (
-    <tr>
-      <td colSpan={cols} style={{ padding: "40px", textAlign: "center", color: "#94a3b8", fontSize: 14 }}>
-        {text}
-      </td>
-    </tr>
+    <div style={{
+      background: "#fff", borderRadius: 12,
+      padding: "14px 16px", marginBottom: 10,
+      boxShadow: "0 1px 4px rgba(0,0,0,0.08)",
+      ...style,
+    }}>
+      {children}
+    </div>
   );
 }
 
 // ── 대시보드 ──────────────────────────────────────────────────────────────
 function Dashboard({ data, week }) {
+  const isMobile = useIsMobile();
   const { callers, receivers, maps, logs } = data;
   const weekLogs = logs.filter(l => l.called_date && getISOWeek(new Date(l.called_date)) === week);
   const answered = weekLogs.filter(l => l.is_answered).length;
@@ -114,77 +133,63 @@ function Dashboard({ data, week }) {
 
   const StatCard = ({ icon, label, value, color }) => (
     <div style={{
-      background: "#fff", borderRadius: 12, padding: "20px 24px",
-      boxShadow: "0 1px 4px rgba(0,0,0,0.08)", flex: 1, minWidth: 0,
+      background: "#fff", borderRadius: 12,
+      padding: isMobile ? "14px 16px" : "20px 24px",
+      boxShadow: "0 1px 4px rgba(0,0,0,0.08)",
+      flex: 1, minWidth: 0,
       borderTop: `4px solid ${color}`,
     }}>
-      <div style={{ fontSize: 26, marginBottom: 8 }}>{icon}</div>
-      <div style={{ fontSize: 30, fontWeight: 800, color: "#0f172a", lineHeight: 1 }}>{value}</div>
-      <div style={{ fontSize: 13, color: "#64748b", marginTop: 6 }}>{label}</div>
+      <div style={{ fontSize: isMobile ? 22 : 26, marginBottom: 6 }}>{icon}</div>
+      <div style={{ fontSize: isMobile ? 24 : 30, fontWeight: 800, color: "#0f172a", lineHeight: 1 }}>{value}</div>
+      <div style={{ fontSize: 12, color: "#64748b", marginTop: 4 }}>{label}</div>
     </div>
   );
 
-  const thStyle = { textAlign: "left", padding: "10px 16px", color: "#64748b", fontWeight: 600, fontSize: 13 };
-  const tdStyle = { padding: "12px 16px", fontSize: 14 };
-
   return (
     <div>
-      <h2 style={{ fontSize: 22, fontWeight: 700, color: "#0f172a", marginBottom: 24 }}>대시보드</h2>
-      <div style={{ display: "flex", gap: 16, marginBottom: 24, flexWrap: "wrap" }}>
+      <h2 style={{ fontSize: 20, fontWeight: 700, color: "#0f172a", marginBottom: 16 }}>대시보드</h2>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 16 }}>
         <StatCard icon="👤" label="전화하는 사람" value={callers.length} color="#0284c7" />
         <StatCard icon="📋" label="전화받는 사람" value={receivers.length} color="#7c3aed" />
         <StatCard icon="🔗" label="이번주 배정" value={total} color="#ea580c" />
-        <StatCard icon="📞" label="이번주 통화완료" value={`${done}/${total}`} color="#16a34a" />
+        <StatCard icon="📞" label="통화완료" value={`${done}/${total}`} color="#16a34a" />
       </div>
 
-      <div style={{ background: "#fff", borderRadius: 12, padding: 24, boxShadow: "0 1px 4px rgba(0,0,0,0.08)", marginBottom: 20 }}>
-        <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 10 }}>
-          <span style={{ fontWeight: 600, color: "#374151" }}>이번주 진행률 ({week})</span>
-          <span style={{ fontWeight: 700, color: "#0284c7" }}>{pct}%</span>
+      <div style={{ background: "#fff", borderRadius: 12, padding: "16px", boxShadow: "0 1px 4px rgba(0,0,0,0.08)", marginBottom: 16 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
+          <span style={{ fontWeight: 600, color: "#374151", fontSize: 14 }}>이번주 진행률</span>
+          <span style={{ fontWeight: 700, color: "#0284c7", fontSize: 14 }}>{pct}%</span>
         </div>
         <div style={{ background: "#e2e8f0", borderRadius: 99, height: 10 }}>
-          <div style={{ background: "#0284c7", borderRadius: 99, height: 10, width: `${pct}%`, transition: "width 0.6s ease" }} />
+          <div style={{ background: "#0284c7", borderRadius: 99, height: 10, width: `${pct}%`, transition: "width 0.6s" }} />
         </div>
-        <div style={{ display: "flex", gap: 20, marginTop: 12, fontSize: 13, color: "#64748b" }}>
-          <span>✓ 수신: <strong>{answered}건</strong></span>
-          <span>✗ 미수신: <strong>{done - answered}건</strong></span>
-          <span>🔲 미완료: <strong>{total - done}건</strong></span>
+        <div style={{ display: "flex", gap: 16, marginTop: 10, fontSize: 13, color: "#64748b", flexWrap: "wrap" }}>
+          <span>✓ 수신 <strong>{answered}</strong></span>
+          <span>✗ 미수신 <strong>{done - answered}</strong></span>
+          <span>🔲 미완료 <strong>{total - done}</strong></span>
         </div>
       </div>
 
       <div style={{ background: "#fff", borderRadius: 12, boxShadow: "0 1px 4px rgba(0,0,0,0.08)", overflow: "hidden" }}>
-        <div style={{ padding: "16px 20px", borderBottom: "1px solid #f1f5f9", fontWeight: 700, color: "#374151", fontSize: 15 }}>
+        <div style={{ padding: "14px 16px", borderBottom: "1px solid #f1f5f9", fontWeight: 700, color: "#374151", fontSize: 14 }}>
           최근 통화 기록
         </div>
-        <div style={{ overflowX: "auto" }}>
-          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14 }}>
-            <thead style={{ background: "#f8fafc" }}>
-              <tr>
-                {["날짜", "전화한 사람", "받은 사람", "학년/반", "수신", "내용"].map(h => (
-                  <th key={h} style={thStyle}>{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {weekLogs.length === 0
-                ? <EmptyRow cols={6} text="이번 주 통화 기록이 없습니다." />
-                : weekLogs.slice(0, 10).map(l => (
-                  <tr key={l.id} style={{ borderTop: "1px solid #f8fafc" }}>
-                    <td style={tdStyle}>{l.called_date}</td>
-                    <td style={tdStyle}>{l.callers?.name || "-"}</td>
-                    <td style={{ ...tdStyle, fontWeight: 600 }}>{l.receivers?.name || "-"}</td>
-                    <td style={{ ...tdStyle, color: "#64748b" }}>
-                      {l.receivers ? `${l.receivers.grade}학년 ${l.receivers.class}반` : "-"}
-                    </td>
-                    <td style={tdStyle}><Badge answered={l.is_answered} /></td>
-                    <td style={{ ...tdStyle, color: "#64748b", maxWidth: 220, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                      {l.content || "-"}
-                    </td>
-                  </tr>
-                ))}
-            </tbody>
-          </table>
-        </div>
+        {weekLogs.length === 0 ? (
+          <div style={{ padding: 32, textAlign: "center", color: "#94a3b8", fontSize: 14 }}>이번 주 통화 기록이 없습니다.</div>
+        ) : (
+          weekLogs.slice(0, 10).map(l => (
+            <div key={l.id} style={{ padding: "12px 16px", borderTop: "1px solid #f8fafc", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontSize: 14, fontWeight: 600, color: "#0f172a" }}>{l.receivers?.name || "-"}</div>
+                <div style={{ fontSize: 12, color: "#64748b", marginTop: 2 }}>
+                  {l.receivers ? `${l.receivers.grade}학년 ${l.receivers.class}반` : ""} · {l.called_date}
+                </div>
+                {l.content && <div style={{ fontSize: 12, color: "#94a3b8", marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{l.content}</div>}
+              </div>
+              <Badge answered={l.is_answered} />
+            </div>
+          ))
+        )}
       </div>
     </div>
   );
@@ -192,6 +197,7 @@ function Dashboard({ data, week }) {
 
 // ── 전화하는 사람 ──────────────────────────────────────────────────────────
 function CallersPage({ callers, onRefresh }) {
+  const isMobile = useIsMobile();
   const [modal, setModal] = useState(false);
   const [editing, setEditing] = useState(null);
   const [form, setForm] = useState({ grade: "", name: "" });
@@ -199,7 +205,6 @@ function CallersPage({ callers, onRefresh }) {
 
   const openAdd = () => { setEditing(null); setForm({ grade: "", name: "" }); setModal(true); };
   const openEdit = (c) => { setEditing(c); setForm({ grade: String(c.grade), name: c.name }); setModal(true); };
-
   const save = async () => {
     if (!form.grade || !form.name.trim()) return alert("학년과 이름을 입력하세요.");
     setSaving(true);
@@ -207,52 +212,66 @@ function CallersPage({ callers, onRefresh }) {
       const payload = { grade: Number(form.grade), name: form.name.trim() };
       if (editing) await db("PATCH", `callers?id=eq.${editing.id}`, payload);
       else await db("POST", "callers", payload);
-      setModal(false);
-      onRefresh();
+      setModal(false); onRefresh();
     } catch (e) { alert(e.message); }
     setSaving(false);
   };
-
   const del = async (id) => {
     if (!confirm("삭제하시겠습니까?")) return;
     try { await db("DELETE", `callers?id=eq.${id}`); onRefresh(); }
     catch (e) { alert(e.message); }
   };
 
-  const thStyle = { textAlign: "left", padding: "12px 20px", color: "#64748b", fontWeight: 600, fontSize: 13 };
-  const tdStyle = { padding: "14px 20px" };
-
   return (
     <div>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
-        <h2 style={{ fontSize: 22, fontWeight: 700, color: "#0f172a" }}>전화하는 사람</h2>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+        <h2 style={{ fontSize: 20, fontWeight: 700, color: "#0f172a" }}>전화하는 사람</h2>
         <button onClick={openAdd} style={btnStyle("primary")}>+ 추가</button>
       </div>
-      <div style={{ background: "#fff", borderRadius: 12, boxShadow: "0 1px 4px rgba(0,0,0,0.08)", overflow: "hidden" }}>
-        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14 }}>
-          <thead style={{ background: "#f8fafc" }}>
-            <tr>
-              <th style={thStyle}>학년</th>
-              <th style={thStyle}>이름</th>
-              <th style={{ ...thStyle, textAlign: "right" }}></th>
-            </tr>
-          </thead>
-          <tbody>
-            {callers.length === 0
-              ? <EmptyRow cols={3} />
-              : callers.map(c => (
+
+      {callers.length === 0 ? (
+        <Card><div style={{ textAlign: "center", color: "#94a3b8", fontSize: 14, padding: "20px 0" }}>등록된 데이터가 없습니다.</div></Card>
+      ) : isMobile ? (
+        callers.map(c => (
+          <Card key={c.id}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <div>
+                <div style={{ fontWeight: 700, fontSize: 16, color: "#0f172a" }}>{c.name}</div>
+                <div style={{ fontSize: 13, color: "#64748b", marginTop: 2 }}>{c.grade}학년</div>
+              </div>
+              <div style={{ display: "flex", gap: 8 }}>
+                <button onClick={() => openEdit(c)} style={btnStyle("ghost", "sm")}>수정</button>
+                <button onClick={() => del(c.id)} style={btnStyle("danger", "sm")}>삭제</button>
+              </div>
+            </div>
+          </Card>
+        ))
+      ) : (
+        <div style={{ background: "#fff", borderRadius: 12, boxShadow: "0 1px 4px rgba(0,0,0,0.08)", overflow: "hidden" }}>
+          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14 }}>
+            <thead style={{ background: "#f8fafc" }}>
+              <tr>
+                {["학년", "이름", ""].map((h, i) => (
+                  <th key={i} style={{ textAlign: i === 2 ? "right" : "left", padding: "12px 20px", color: "#64748b", fontWeight: 600, fontSize: 13 }}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {callers.map(c => (
                 <tr key={c.id} style={{ borderTop: "1px solid #f1f5f9" }}>
-                  <td style={tdStyle}>{c.grade}학년</td>
-                  <td style={{ ...tdStyle, fontWeight: 600 }}>{c.name}</td>
-                  <td style={{ ...tdStyle, textAlign: "right" }}>
-                    <button onClick={() => openEdit(c)} style={{ ...btnStyle("ghost"), marginRight: 8 }}>수정</button>
-                    <button onClick={() => del(c.id)} style={btnStyle("danger")}>삭제</button>
+                  <td style={{ padding: "14px 20px" }}>{c.grade}학년</td>
+                  <td style={{ padding: "14px 20px", fontWeight: 600 }}>{c.name}</td>
+                  <td style={{ padding: "14px 20px", textAlign: "right" }}>
+                    <button onClick={() => openEdit(c)} style={{ ...btnStyle("ghost", "sm"), marginRight: 8 }}>수정</button>
+                    <button onClick={() => del(c.id)} style={btnStyle("danger", "sm")}>삭제</button>
                   </td>
                 </tr>
               ))}
-          </tbody>
-        </table>
-      </div>
+            </tbody>
+          </table>
+        </div>
+      )}
+
       {modal && (
         <Modal title={editing ? "수정" : "전화하는 사람 추가"} onClose={() => setModal(false)}>
           <Field label="학년 *">
@@ -275,6 +294,7 @@ function CallersPage({ callers, onRefresh }) {
 
 // ── 전화받는 사람 ──────────────────────────────────────────────────────────
 function ReceiversPage({ receivers, onRefresh }) {
+  const isMobile = useIsMobile();
   const [modal, setModal] = useState(false);
   const [editing, setEditing] = useState(null);
   const [form, setForm] = useState({ grade: "", class: "", name: "", phone: "", note: "" });
@@ -287,7 +307,6 @@ function ReceiversPage({ receivers, onRefresh }) {
     setForm({ grade: String(r.grade), class: String(r.class), name: r.name, phone: r.phone, note: r.note || "" });
     setModal(true);
   };
-
   const save = async () => {
     if (!form.grade || !form.class || !form.name.trim() || !form.phone.trim())
       return alert("학년, 반, 이름, 전화번호는 필수입니다.");
@@ -296,12 +315,10 @@ function ReceiversPage({ receivers, onRefresh }) {
       const payload = { grade: Number(form.grade), class: Number(form.class), name: form.name.trim(), phone: form.phone.trim(), note: form.note || null };
       if (editing) await db("PATCH", `receivers?id=eq.${editing.id}`, payload);
       else await db("POST", "receivers", payload);
-      setModal(false);
-      onRefresh();
+      setModal(false); onRefresh();
     } catch (e) { alert(e.message); }
     setSaving(false);
   };
-
   const del = async (id) => {
     if (!confirm("삭제하시겠습니까?")) return;
     try { await db("DELETE", `receivers?id=eq.${id}`); onRefresh(); }
@@ -311,52 +328,69 @@ function ReceiversPage({ receivers, onRefresh }) {
   const grades = [...new Set(receivers.map(r => r.grade))].sort((a, b) => a - b);
   const filtered = filterGrade ? receivers.filter(r => r.grade === Number(filterGrade)) : receivers;
 
-  const thStyle = { textAlign: "left", padding: "12px 20px", color: "#64748b", fontWeight: 600, fontSize: 13 };
-  const tdStyle = { padding: "13px 20px", fontSize: 14 };
-
   return (
     <div>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
-        <h2 style={{ fontSize: 22, fontWeight: 700, color: "#0f172a" }}>전화받는 사람</h2>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+        <h2 style={{ fontSize: 20, fontWeight: 700, color: "#0f172a" }}>전화받는 사람</h2>
         <div style={{ display: "flex", gap: 8 }}>
           <select value={filterGrade} onChange={e => setFilterGrade(e.target.value)}
-            style={{ ...inputStyle, width: "auto", padding: "8px 12px" }}>
-            <option value="">전체 학년</option>
+            style={{ ...inputStyle, width: "auto", padding: "8px 10px", fontSize: 13 }}>
+            <option value="">전체</option>
             {grades.map(g => <option key={g} value={g}>{g}학년</option>)}
           </select>
           <button onClick={openAdd} style={btnStyle("primary")}>+ 추가</button>
         </div>
       </div>
-      <div style={{ background: "#fff", borderRadius: 12, boxShadow: "0 1px 4px rgba(0,0,0,0.08)", overflow: "hidden" }}>
-        <div style={{ overflowX: "auto" }}>
-          <table style={{ width: "100%", borderCollapse: "collapse" }}>
-            <thead style={{ background: "#f8fafc" }}>
-              <tr>
-                {["학년", "반", "이름", "전화번호", "특이사항", ""].map((h, i) => (
-                  <th key={i} style={{ ...thStyle, textAlign: i === 5 ? "right" : "left" }}>{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.length === 0
-                ? <EmptyRow cols={6} />
-                : filtered.map(r => (
+
+      {filtered.length === 0 ? (
+        <Card><div style={{ textAlign: "center", color: "#94a3b8", fontSize: 14, padding: "20px 0" }}>등록된 데이터가 없습니다.</div></Card>
+      ) : isMobile ? (
+        filtered.map(r => (
+          <Card key={r.id}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontWeight: 700, fontSize: 16, color: "#0f172a" }}>{r.name}</div>
+                <div style={{ fontSize: 13, color: "#64748b", marginTop: 2 }}>{r.grade}학년 {r.class}반 · {r.phone}</div>
+                {r.note && <div style={{ fontSize: 12, color: "#ef4444", marginTop: 4 }}>⚠️ {r.note}</div>}
+              </div>
+              <div style={{ display: "flex", gap: 6, flexShrink: 0, marginLeft: 8 }}>
+                <button onClick={() => openEdit(r)} style={btnStyle("ghost", "sm")}>수정</button>
+                <button onClick={() => del(r.id)} style={btnStyle("danger", "sm")}>삭제</button>
+              </div>
+            </div>
+          </Card>
+        ))
+      ) : (
+        <div style={{ background: "#fff", borderRadius: 12, boxShadow: "0 1px 4px rgba(0,0,0,0.08)", overflow: "hidden" }}>
+          <div style={{ overflowX: "auto" }}>
+            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14 }}>
+              <thead style={{ background: "#f8fafc" }}>
+                <tr>
+                  {["학년", "반", "이름", "전화번호", "특이사항", ""].map((hd, i) => (
+                    <th key={i} style={{ textAlign: i === 5 ? "right" : "left", padding: "12px 20px", color: "#64748b", fontWeight: 600, fontSize: 13 }}>{hd}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.map(r => (
                   <tr key={r.id} style={{ borderTop: "1px solid #f1f5f9" }}>
-                    <td style={tdStyle}>{r.grade}학년</td>
-                    <td style={tdStyle}>{r.class}반</td>
-                    <td style={{ ...tdStyle, fontWeight: 600 }}>{r.name}</td>
-                    <td style={tdStyle}>{r.phone}</td>
-                    <td style={{ ...tdStyle, color: r.note ? "#ef4444" : "#94a3b8", maxWidth: 200 }}>{r.note || "-"}</td>
-                    <td style={{ ...tdStyle, textAlign: "right" }}>
-                      <button onClick={() => openEdit(r)} style={{ ...btnStyle("ghost"), marginRight: 8 }}>수정</button>
-                      <button onClick={() => del(r.id)} style={btnStyle("danger")}>삭제</button>
+                    <td style={{ padding: "13px 20px" }}>{r.grade}학년</td>
+                    <td style={{ padding: "13px 20px" }}>{r.class}반</td>
+                    <td style={{ padding: "13px 20px", fontWeight: 600 }}>{r.name}</td>
+                    <td style={{ padding: "13px 20px" }}>{r.phone}</td>
+                    <td style={{ padding: "13px 20px", color: r.note ? "#ef4444" : "#94a3b8" }}>{r.note || "-"}</td>
+                    <td style={{ padding: "13px 20px", textAlign: "right" }}>
+                      <button onClick={() => openEdit(r)} style={{ ...btnStyle("ghost", "sm"), marginRight: 8 }}>수정</button>
+                      <button onClick={() => del(r.id)} style={btnStyle("danger", "sm")}>삭제</button>
                     </td>
                   </tr>
                 ))}
-            </tbody>
-          </table>
+              </tbody>
+            </table>
+          </div>
         </div>
-      </div>
+      )}
+
       {modal && (
         <Modal title={editing ? "수정" : "전화받는 사람 추가"} onClose={() => setModal(false)}>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
@@ -393,6 +427,7 @@ function ReceiversPage({ receivers, onRefresh }) {
 
 // ── 주간 배정 ──────────────────────────────────────────────────────────────
 function MapsPage({ data, week, onRefresh }) {
+  const isMobile = useIsMobile();
   const { callers, receivers, maps } = data;
   const [modal, setModal] = useState(false);
   const [form, setForm] = useState({ caller_id: "", receiver_id: "" });
@@ -404,13 +439,10 @@ function MapsPage({ data, week, onRefresh }) {
     setSaving(true);
     try {
       await db("POST", "caller_receiver_map", { ...form, week_label: week });
-      setModal(false);
-      setForm({ caller_id: "", receiver_id: "" });
-      onRefresh();
+      setModal(false); setForm({ caller_id: "", receiver_id: "" }); onRefresh();
     } catch (e) { alert(e.message); }
     setSaving(false);
   };
-
   const del = async (id) => {
     if (!confirm("배정을 삭제하시겠습니까?")) return;
     try { await db("DELETE", `caller_receiver_map?id=eq.${id}`); onRefresh(); }
@@ -420,55 +452,46 @@ function MapsPage({ data, week, onRefresh }) {
   const filtered = filterCaller ? maps.filter(m => m.caller_id === filterCaller) : maps;
   const groups = {};
   filtered.forEach(m => {
-    const key = m.caller_id;
-    if (!groups[key]) groups[key] = { caller: m.callers, items: [] };
-    groups[key].items.push(m);
+    if (!groups[m.caller_id]) groups[m.caller_id] = { caller: m.callers, items: [] };
+    groups[m.caller_id].items.push(m);
   });
-
-  const tdStyle = { padding: "12px 20px", fontSize: 14 };
 
   return (
     <div>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
-        <div>
-          <h2 style={{ fontSize: 22, fontWeight: 700, color: "#0f172a", marginBottom: 4 }}>주간 배정</h2>
-          <span style={{ fontSize: 13, color: "#64748b" }}>현재 주: {week}</span>
-        </div>
-        <div style={{ display: "flex", gap: 8 }}>
-          <select value={filterCaller} onChange={e => setFilterCaller(e.target.value)}
-            style={{ ...inputStyle, width: "auto", padding: "8px 12px" }}>
-            <option value="">전체 담당자</option>
-            {callers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-          </select>
-          <button onClick={() => setModal(true)} style={btnStyle("primary")}>+ 배정 추가</button>
-        </div>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
+        <h2 style={{ fontSize: 20, fontWeight: 700, color: "#0f172a" }}>주간 배정</h2>
+        <button onClick={() => setModal(true)} style={btnStyle("primary")}>+ 추가</button>
       </div>
+      <div style={{ fontSize: 13, color: "#64748b", marginBottom: 16 }}>{week}</div>
+
+      <select value={filterCaller} onChange={e => setFilterCaller(e.target.value)}
+        style={{ ...inputStyle, marginBottom: 16, fontSize: 14 }}>
+        <option value="">전체 담당자</option>
+        {callers.map(c => <option key={c.id} value={c.id}>{c.grade}학년 {c.name}</option>)}
+      </select>
 
       {Object.keys(groups).length === 0 ? (
-        <div style={{ background: "#fff", borderRadius: 12, padding: 48, textAlign: "center", color: "#94a3b8", boxShadow: "0 1px 4px rgba(0,0,0,0.08)", fontSize: 14 }}>
-          이번 주 배정 내역이 없습니다.
-        </div>
+        <Card><div style={{ textAlign: "center", color: "#94a3b8", fontSize: 14, padding: "20px 0" }}>이번 주 배정 내역이 없습니다.</div></Card>
       ) : Object.entries(groups).map(([, group]) => (
-        <div key={group.caller?.id} style={{ background: "#fff", borderRadius: 12, boxShadow: "0 1px 4px rgba(0,0,0,0.08)", marginBottom: 16, overflow: "hidden" }}>
-          <div style={{ padding: "14px 20px", background: "#f0f9ff", borderBottom: "1px solid #bae6fd", fontWeight: 700, color: "#0369a1", fontSize: 15 }}>
+        <div key={group.caller?.id} style={{ marginBottom: 16 }}>
+          <div style={{ padding: "10px 14px", background: "#f0f9ff", borderRadius: "12px 12px 0 0", borderBottom: "1px solid #bae6fd", fontWeight: 700, color: "#0369a1", fontSize: 14 }}>
             👤 {group.caller?.grade}학년 {group.caller?.name}
-            <span style={{ fontSize: 13, fontWeight: 400, marginLeft: 8, color: "#0284c7" }}>({group.items.length}명 배정)</span>
+            <span style={{ fontSize: 13, fontWeight: 400, marginLeft: 8, color: "#0284c7" }}>({group.items.length}명)</span>
           </div>
-          <table style={{ width: "100%", borderCollapse: "collapse" }}>
-            <tbody>
-              {group.items.map(m => (
-                <tr key={m.id} style={{ borderTop: "1px solid #f1f5f9" }}>
-                  <td style={tdStyle}>{m.receivers?.grade}학년 {m.receivers?.class}반</td>
-                  <td style={{ ...tdStyle, fontWeight: 600 }}>{m.receivers?.name}</td>
-                  <td style={tdStyle}>{m.receivers?.phone}</td>
-                  <td style={{ ...tdStyle, color: m.receivers?.note ? "#ef4444" : "#94a3b8", fontSize: 13 }}>{m.receivers?.note || "-"}</td>
-                  <td style={{ ...tdStyle, textAlign: "right" }}>
-                    <button onClick={() => del(m.id)} style={btnStyle("danger")}>삭제</button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <div style={{ background: "#fff", borderRadius: "0 0 12px 12px", boxShadow: "0 1px 4px rgba(0,0,0,0.08)", overflow: "hidden" }}>
+            {group.items.map(m => (
+              <div key={m.id} style={{ padding: "12px 14px", borderTop: "1px solid #f1f5f9", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <div>
+                  <span style={{ fontWeight: 600, fontSize: 14 }}>{m.receivers?.name}</span>
+                  <span style={{ fontSize: 13, color: "#64748b", marginLeft: 8 }}>{m.receivers?.grade}학년 {m.receivers?.class}반</span>
+                  {isMobile && <div style={{ fontSize: 13, color: "#94a3b8", marginTop: 2 }}>{m.receivers?.phone}</div>}
+                  {!isMobile && <span style={{ fontSize: 13, color: "#94a3b8", marginLeft: 8 }}>{m.receivers?.phone}</span>}
+                  {m.receivers?.note && <div style={{ fontSize: 12, color: "#ef4444", marginTop: 2 }}>⚠️ {m.receivers.note}</div>}
+                </div>
+                <button onClick={() => del(m.id)} style={btnStyle("danger", "sm")}>삭제</button>
+              </div>
+            ))}
+          </div>
         </div>
       ))}
 
@@ -498,6 +521,7 @@ function MapsPage({ data, week, onRefresh }) {
 
 // ── 통화 기록 입력 ─────────────────────────────────────────────────────────
 function LogsPage({ data, week, onRefresh }) {
+  const isMobile = useIsMobile();
   const { callers, maps, logs } = data;
   const [selectedCaller, setSelectedCaller] = useState("");
   const [modal, setModal] = useState(null);
@@ -505,11 +529,9 @@ function LogsPage({ data, week, onRefresh }) {
   const [saving, setSaving] = useState(false);
 
   const myMaps = maps.filter(m => m.caller_id === selectedCaller);
-
   const getLog = (receiverId) =>
     logs.find(l =>
-      l.receiver_id === receiverId &&
-      l.caller_id === selectedCaller &&
+      l.receiver_id === receiverId && l.caller_id === selectedCaller &&
       l.called_date && getISOWeek(new Date(l.called_date)) === week
     );
 
@@ -528,17 +550,10 @@ function LogsPage({ data, week, onRefresh }) {
     setSaving(true);
     try {
       const existing = getLog(modal.receiver_id);
-      const payload = {
-        caller_id: selectedCaller,
-        receiver_id: modal.receiver_id,
-        called_date: form.called_date,
-        is_answered: form.is_answered,
-        content: form.content || null,
-      };
+      const payload = { caller_id: selectedCaller, receiver_id: modal.receiver_id, called_date: form.called_date, is_answered: form.is_answered, content: form.content || null };
       if (existing) await db("PATCH", `call_logs?id=eq.${existing.id}`, payload);
       else await db("POST", "call_logs", payload);
-      setModal(null);
-      onRefresh();
+      setModal(null); onRefresh();
     } catch (e) { alert(e.message); }
     setSaving(false);
   };
@@ -551,60 +566,71 @@ function LogsPage({ data, week, onRefresh }) {
   };
 
   const doneCount = myMaps.filter(m => getLog(m.receiver_id)).length;
-  const thStyle = { textAlign: "left", padding: "11px 20px", color: "#64748b", fontWeight: 600, fontSize: 13 };
-  const tdStyle = { padding: "13px 20px", fontSize: 14 };
 
   return (
     <div>
-      <div style={{ marginBottom: 24 }}>
-        <h2 style={{ fontSize: 22, fontWeight: 700, color: "#0f172a", marginBottom: 4 }}>통화 기록 입력</h2>
+      <div style={{ marginBottom: 16 }}>
+        <h2 style={{ fontSize: 20, fontWeight: 700, color: "#0f172a", marginBottom: 2 }}>통화 기록 입력</h2>
         <span style={{ fontSize: 13, color: "#64748b" }}>{week}</span>
       </div>
 
-      <div style={{ background: "#fff", borderRadius: 12, padding: "18px 24px", boxShadow: "0 1px 4px rgba(0,0,0,0.08)", marginBottom: 20, display: "flex", alignItems: "center", gap: 16, flexWrap: "wrap" }}>
-        <label style={{ fontSize: 14, fontWeight: 600, color: "#374151", whiteSpace: "nowrap" }}>전화하는 사람 선택</label>
-        <select value={selectedCaller} onChange={e => setSelectedCaller(e.target.value)}
-          style={{ ...inputStyle, width: "auto", minWidth: 180 }}>
+      <div style={{ background: "#fff", borderRadius: 12, padding: "14px 16px", boxShadow: "0 1px 4px rgba(0,0,0,0.08)", marginBottom: 16 }}>
+        <label style={{ fontSize: 13, fontWeight: 600, color: "#374151", display: "block", marginBottom: 8 }}>전화하는 사람 선택</label>
+        <select value={selectedCaller} onChange={e => setSelectedCaller(e.target.value)} style={inputStyle}>
           <option value="">담당자를 선택하세요</option>
           {callers.map(c => <option key={c.id} value={c.id}>{c.grade}학년 {c.name}</option>)}
         </select>
         {selectedCaller && myMaps.length > 0 && (
-          <span style={{ fontSize: 13, color: "#0284c7", fontWeight: 600 }}>
-            {myMaps.length}명 배정 · {doneCount}명 완료
-          </span>
+          <div style={{ marginTop: 10 }}>
+            <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginBottom: 6 }}>
+              {myMaps.map(m => {
+                const log = getLog(m.receiver_id);
+                return <div key={m.id} style={{ width: 12, height: 12, borderRadius: "50%", background: log ? (log.is_answered ? "#16a34a" : "#ef4444") : "#e2e8f0" }} title={m.receivers?.name} />;
+              })}
+            </div>
+            <span style={{ fontSize: 13, color: "#0284c7", fontWeight: 600 }}>{myMaps.length}명 배정 · {doneCount}명 완료</span>
+          </div>
         )}
       </div>
 
       {!selectedCaller ? (
-        <div style={{ background: "#fff", borderRadius: 12, padding: 48, textAlign: "center", color: "#94a3b8", boxShadow: "0 1px 4px rgba(0,0,0,0.08)", fontSize: 14 }}>
-          담당자를 선택하면 이번 주 배정 목록이 표시됩니다.
-        </div>
+        <Card><div style={{ textAlign: "center", color: "#94a3b8", fontSize: 14, padding: "20px 0" }}>담당자를 선택하면 배정 목록이 표시됩니다.</div></Card>
       ) : myMaps.length === 0 ? (
-        <div style={{ background: "#fff", borderRadius: 12, padding: 48, textAlign: "center", color: "#94a3b8", boxShadow: "0 1px 4px rgba(0,0,0,0.08)", fontSize: 14 }}>
-          이번 주 배정된 대상자가 없습니다.
-        </div>
+        <Card><div style={{ textAlign: "center", color: "#94a3b8", fontSize: 14, padding: "20px 0" }}>이번 주 배정된 대상자가 없습니다.</div></Card>
+      ) : isMobile ? (
+        myMaps.map(m => {
+          const log = getLog(m.receiver_id);
+          const r = m.receivers;
+          return (
+            <Card key={m.id} style={{ background: log ? (log.is_answered ? "#f0fdf4" : "#fff7f7") : "#fff" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ fontWeight: 700, fontSize: 16, color: "#0f172a" }}>{r?.name}</div>
+                  <div style={{ fontSize: 13, color: "#64748b", marginTop: 2 }}>{r?.grade}학년 {r?.class}반 · {r?.phone}</div>
+                  {r?.note && <div style={{ fontSize: 12, color: "#ef4444", marginTop: 4 }}>⚠️ {r.note}</div>}
+                  {log && (
+                    <div style={{ marginTop: 6 }}>
+                      <Badge answered={log.is_answered} />
+                      {log.content && <div style={{ fontSize: 12, color: "#64748b", marginTop: 4 }}>{log.content}</div>}
+                    </div>
+                  )}
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 6, flexShrink: 0, marginLeft: 10 }}>
+                  <button onClick={() => openModal(m)} style={btnStyle("primary", "sm")}>{log ? "수정" : "기록"}</button>
+                  {log && <button onClick={() => deleteLog(m.receiver_id)} style={btnStyle("danger", "sm")}>삭제</button>}
+                </div>
+              </div>
+            </Card>
+          );
+        })
       ) : (
         <div style={{ background: "#fff", borderRadius: 12, boxShadow: "0 1px 4px rgba(0,0,0,0.08)", overflow: "hidden" }}>
-          <div style={{ padding: "12px 20px", background: "#f0f9ff", borderBottom: "1px solid #bae6fd", display: "flex", alignItems: "center", gap: 8 }}>
-            {myMaps.map(m => {
-              const log = getLog(m.receiver_id);
-              return (
-                <div key={m.id} style={{
-                  width: 12, height: 12, borderRadius: "50%",
-                  background: log ? (log.is_answered ? "#16a34a" : "#ef4444") : "#e2e8f0",
-                }} title={m.receivers?.name} />
-              );
-            })}
-            <span style={{ fontSize: 12, color: "#0284c7", fontWeight: 600, marginLeft: 4 }}>
-              {doneCount}/{myMaps.length} 완료
-            </span>
-          </div>
           <div style={{ overflowX: "auto" }}>
             <table style={{ width: "100%", borderCollapse: "collapse" }}>
               <thead style={{ background: "#f8fafc" }}>
                 <tr>
-                  {["학년", "반", "이름", "전화번호", "특이사항", "상태", ""].map((h, i) => (
-                    <th key={i} style={{ ...thStyle, textAlign: i === 6 ? "right" : "left" }}>{h}</th>
+                  {["학년", "반", "이름", "전화번호", "특이사항", "상태", ""].map((hd, i) => (
+                    <th key={i} style={{ textAlign: i === 6 ? "right" : "left", padding: "11px 20px", color: "#64748b", fontWeight: 600, fontSize: 13 }}>{hd}</th>
                   ))}
                 </tr>
               </thead>
@@ -613,27 +639,16 @@ function LogsPage({ data, week, onRefresh }) {
                   const log = getLog(m.receiver_id);
                   const r = m.receivers;
                   return (
-                    <tr key={m.id} style={{
-                      borderTop: "1px solid #f1f5f9",
-                      background: log ? (log.is_answered ? "#f0fdf4" : "#fff7f7") : "#fff",
-                    }}>
-                      <td style={tdStyle}>{r?.grade}학년</td>
-                      <td style={tdStyle}>{r?.class}반</td>
-                      <td style={{ ...tdStyle, fontWeight: 700 }}>{r?.name}</td>
-                      <td style={tdStyle}>{r?.phone}</td>
-                      <td style={{ ...tdStyle, color: r?.note ? "#ef4444" : "#94a3b8", fontSize: 13 }}>
-                        {r?.note ? `⚠️ ${r.note}` : "-"}
-                      </td>
-                      <td style={tdStyle}>
-                        {log ? <Badge answered={log.is_answered} /> : <span style={{ fontSize: 12, color: "#94a3b8" }}>미완료</span>}
-                      </td>
-                      <td style={{ ...tdStyle, textAlign: "right", whiteSpace: "nowrap" }}>
-                        <button onClick={() => openModal(m)} style={{ ...btnStyle("primary"), marginRight: 8, padding: "6px 14px" }}>
-                          {log ? "수정" : "기록"}
-                        </button>
-                        {log && (
-                          <button onClick={() => deleteLog(m.receiver_id)} style={{ ...btnStyle("danger"), padding: "6px 14px" }}>삭제</button>
-                        )}
+                    <tr key={m.id} style={{ borderTop: "1px solid #f1f5f9", background: log ? (log.is_answered ? "#f0fdf4" : "#fff7f7") : "#fff" }}>
+                      <td style={{ padding: "13px 20px", fontSize: 14 }}>{r?.grade}학년</td>
+                      <td style={{ padding: "13px 20px", fontSize: 14 }}>{r?.class}반</td>
+                      <td style={{ padding: "13px 20px", fontSize: 14, fontWeight: 700 }}>{r?.name}</td>
+                      <td style={{ padding: "13px 20px", fontSize: 14 }}>{r?.phone}</td>
+                      <td style={{ padding: "13px 20px", fontSize: 13, color: r?.note ? "#ef4444" : "#94a3b8" }}>{r?.note ? `⚠️ ${r.note}` : "-"}</td>
+                      <td style={{ padding: "13px 20px" }}>{log ? <Badge answered={log.is_answered} /> : <span style={{ fontSize: 12, color: "#94a3b8" }}>미완료</span>}</td>
+                      <td style={{ padding: "13px 20px", textAlign: "right", whiteSpace: "nowrap" }}>
+                        <button onClick={() => openModal(m)} style={{ ...btnStyle("primary", "sm"), marginRight: 8 }}>{log ? "수정" : "기록"}</button>
+                        {log && <button onClick={() => deleteLog(m.receiver_id)} style={btnStyle("danger", "sm")}>삭제</button>}
                       </td>
                     </tr>
                   );
@@ -646,23 +661,22 @@ function LogsPage({ data, week, onRefresh }) {
 
       {modal && (
         <Modal title={`통화 기록 - ${modal.receivers?.name}`} onClose={() => setModal(null)}>
-          <div style={{ padding: "12px 16px", background: "#f0f9ff", borderRadius: 10, marginBottom: 20, fontSize: 14 }}>
+          <div style={{ padding: "12px 14px", background: "#f0f9ff", borderRadius: 10, marginBottom: 18, fontSize: 14 }}>
             <strong style={{ fontSize: 15 }}>{modal.receivers?.grade}학년 {modal.receivers?.class}반 {modal.receivers?.name}</strong>
-            <span style={{ color: "#0284c7", marginLeft: 10 }}>{modal.receivers?.phone}</span>
-            {modal.receivers?.note && (
-              <div style={{ color: "#ef4444", fontSize: 13, marginTop: 6 }}>⚠️ {modal.receivers.note}</div>
-            )}
+            <div style={{ color: "#0284c7", marginTop: 4 }}>{modal.receivers?.phone}</div>
+            {modal.receivers?.note && <div style={{ color: "#ef4444", fontSize: 13, marginTop: 4 }}>⚠️ {modal.receivers.note}</div>}
           </div>
           <Field label="전화한 날짜 *">
             <input style={inputStyle} type="date" value={form.called_date}
               onChange={e => setForm({ ...form, called_date: e.target.value })} />
           </Field>
           <Field label="수신 여부 *">
-            <div style={{ display: "flex", gap: 20 }}>
+            <div style={{ display: "flex", gap: 24 }}>
               {[{ v: true, label: "✓ 수신" }, { v: false, label: "✗ 미수신" }].map(({ v, label }) => (
-                <label key={String(v)} style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", fontSize: 14, fontWeight: 500 }}>
+                <label key={String(v)} style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", fontSize: 15, fontWeight: 500 }}>
                   <input type="radio" name="answered" checked={form.is_answered === v}
-                    onChange={() => setForm({ ...form, is_answered: v })} />
+                    onChange={() => setForm({ ...form, is_answered: v })}
+                    style={{ width: 18, height: 18, accentColor: v ? "#16a34a" : "#ef4444" }} />
                   <span style={{ color: v ? "#16a34a" : "#ef4444" }}>{label}</span>
                 </label>
               ))}
@@ -685,6 +699,7 @@ function LogsPage({ data, week, onRefresh }) {
 
 // ── 메인 앱 ───────────────────────────────────────────────────────────────
 export default function App() {
+  const isMobile = useIsMobile();
   const [page, setPage] = useState("dashboard");
   const [data, setData] = useState({ callers: [], receivers: [], maps: [], logs: [] });
   const [loading, setLoading] = useState(true);
@@ -700,9 +715,7 @@ export default function App() {
         db("GET", "call_logs?select=*,callers(*),receivers(*)&order=recorded_at.desc&limit=500"),
       ]);
       setData({ callers, receivers, maps, logs });
-    } catch (e) {
-      setErr(e.message);
-    }
+    } catch (e) { setErr(e.message); }
     setLoading(false);
   };
 
@@ -725,51 +738,103 @@ export default function App() {
   };
 
   return (
-    <div style={{ display: "flex", minHeight: "100vh", fontFamily: "'Apple SD Gothic Neo', 'Malgun Gothic', 'Segoe UI', sans-serif" }}>
-      <div style={{ width: 224, background: "#0c4a6e", minHeight: "100vh", display: "flex", flexDirection: "column", flexShrink: 0 }}>
-        <div style={{ padding: "28px 20px 20px", borderBottom: "1px solid #075985" }}>
-          <div style={{ fontSize: 26, marginBottom: 6 }}>📞</div>
-          <div style={{ color: "#fff", fontSize: 16, fontWeight: 700 }}>통화 관리</div>
-          <div style={{ color: "#7dd3fc", fontSize: 12, marginTop: 2 }}>주간 통화 기록 시스템</div>
-        </div>
-        <nav style={{ padding: "10px 0", flex: 1 }}>
-          {nav.map(n => (
-            <div key={n.id} onClick={() => setPage(n.id)} style={{
-              padding: "12px 20px", cursor: "pointer",
-              display: "flex", alignItems: "center", gap: 10,
-              fontSize: 14, fontWeight: page === n.id ? 600 : 400,
-              color: page === n.id ? "#fff" : "#93c5fd",
-              background: page === n.id ? "#075985" : "transparent",
-              borderLeft: `3px solid ${page === n.id ? "#38bdf8" : "transparent"}`,
-              transition: "all 0.12s",
-            }}>
-              <span>{n.icon}</span><span>{n.label}</span>
-            </div>
-          ))}
-        </nav>
-        <div style={{ padding: "16px 20px", borderTop: "1px solid #075985" }}>
-          <div style={{ fontSize: 11, color: "#7dd3fc", marginBottom: 2 }}>현재 주</div>
-          <div style={{ fontSize: 13, color: "#fff", fontWeight: 600, marginBottom: 10 }}>{THIS_WEEK}</div>
-          <button onClick={load} style={{ background: "#075985", border: "none", color: "#7dd3fc", padding: "7px 14px", borderRadius: 6, cursor: "pointer", fontSize: 12, fontFamily: "inherit", width: "100%" }}>
-            🔄 새로고침
-          </button>
-        </div>
-      </div>
+    <div style={{ fontFamily: "'Apple SD Gothic Neo', 'Malgun Gothic', 'Segoe UI', sans-serif" }}>
+      <style>{`
+        * { box-sizing: border-box; }
+        body { margin: 0; padding: 0; }
+        @keyframes slideUp { from { transform: translateY(100px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+      `}</style>
 
-      <div style={{ flex: 1, background: "#f0f9ff", padding: 32, overflowY: "auto", minWidth: 0 }}>
-        {loading && (
-          <div style={{ marginBottom: 16, padding: "10px 16px", background: "#e0f2fe", borderRadius: 8, fontSize: 13, color: "#0284c7" }}>
-            ⏳ 로딩 중...
+      {isMobile ? (
+        /* ── 모바일 레이아웃 ── */
+        <div style={{ display: "flex", flexDirection: "column", minHeight: "100vh", background: "#f0f9ff" }}>
+          {/* 상단 헤더 */}
+          <div style={{ background: "#0c4a6e", padding: "14px 16px", display: "flex", justifyContent: "space-between", alignItems: "center", position: "sticky", top: 0, zIndex: 100 }}>
+            <div>
+              <div style={{ color: "#fff", fontSize: 16, fontWeight: 700 }}>📞 통화 관리</div>
+              <div style={{ color: "#7dd3fc", fontSize: 11, marginTop: 1 }}>{THIS_WEEK}</div>
+            </div>
+            <button onClick={load} style={{ background: "#075985", border: "none", color: "#7dd3fc", padding: "7px 12px", borderRadius: 8, cursor: "pointer", fontSize: 13, fontFamily: "inherit" }}>
+              🔄
+            </button>
           </div>
-        )}
-        {err && (
-          <div style={{ marginBottom: 16, padding: "12px 16px", background: "#fee2e2", borderRadius: 8, fontSize: 13, color: "#dc2626" }}>
-            ⚠️ DB 연결 오류: {err}<br />
-            <span style={{ fontSize: 12, color: "#ef4444" }}>src/config.js 의 SUPABASE_URL 과 SUPABASE_ANON_KEY 를 확인하세요.</span>
+
+          {/* 에러/로딩 */}
+          {loading && <div style={{ padding: "10px 16px", background: "#e0f2fe", fontSize: 13, color: "#0284c7" }}>⏳ 로딩 중...</div>}
+          {err && <div style={{ padding: "10px 16px", background: "#fee2e2", fontSize: 13, color: "#dc2626" }}>⚠️ {err}</div>}
+
+          {/* 콘텐츠 */}
+          <div style={{ flex: 1, padding: "16px", paddingBottom: 80, overflowY: "auto" }}>
+            {pages[page]}
           </div>
-        )}
-        {pages[page]}
-      </div>
+
+          {/* 하단 탭바 */}
+          <div style={{
+            position: "fixed", bottom: 0, left: 0, right: 0,
+            background: "#fff", borderTop: "1px solid #e2e8f0",
+            display: "flex", zIndex: 100,
+            paddingBottom: "env(safe-area-inset-bottom)",
+          }}>
+            {nav.map(n => (
+              <button key={n.id} onClick={() => setPage(n.id)} style={{
+                flex: 1, border: "none", background: "none", cursor: "pointer",
+                padding: "10px 4px 8px", display: "flex", flexDirection: "column",
+                alignItems: "center", gap: 3,
+                color: page === n.id ? "#0284c7" : "#94a3b8",
+                fontFamily: "inherit",
+              }}>
+                <span style={{ fontSize: 20 }}>{n.icon}</span>
+                <span style={{ fontSize: 10, fontWeight: page === n.id ? 700 : 400, whiteSpace: "nowrap" }}>
+                  {n.label.length > 5 ? n.label.slice(0, 5) + ".." : n.label}
+                </span>
+              </button>
+            ))}
+          </div>
+        </div>
+      ) : (
+        /* ── PC 레이아웃 ── */
+        <div style={{ display: "flex", minHeight: "100vh" }}>
+          <div style={{ width: 224, background: "#0c4a6e", minHeight: "100vh", display: "flex", flexDirection: "column", flexShrink: 0 }}>
+            <div style={{ padding: "28px 20px 20px", borderBottom: "1px solid #075985" }}>
+              <div style={{ fontSize: 26, marginBottom: 6 }}>📞</div>
+              <div style={{ color: "#fff", fontSize: 16, fontWeight: 700 }}>통화 관리</div>
+              <div style={{ color: "#7dd3fc", fontSize: 12, marginTop: 2 }}>주간 통화 기록 시스템</div>
+            </div>
+            <nav style={{ padding: "10px 0", flex: 1 }}>
+              {nav.map(n => (
+                <div key={n.id} onClick={() => setPage(n.id)} style={{
+                  padding: "12px 20px", cursor: "pointer",
+                  display: "flex", alignItems: "center", gap: 10,
+                  fontSize: 14, fontWeight: page === n.id ? 600 : 400,
+                  color: page === n.id ? "#fff" : "#93c5fd",
+                  background: page === n.id ? "#075985" : "transparent",
+                  borderLeft: `3px solid ${page === n.id ? "#38bdf8" : "transparent"}`,
+                  transition: "all 0.12s",
+                }}>
+                  <span>{n.icon}</span><span>{n.label}</span>
+                </div>
+              ))}
+            </nav>
+            <div style={{ padding: "16px 20px", borderTop: "1px solid #075985" }}>
+              <div style={{ fontSize: 11, color: "#7dd3fc", marginBottom: 2 }}>현재 주</div>
+              <div style={{ fontSize: 13, color: "#fff", fontWeight: 600, marginBottom: 10 }}>{THIS_WEEK}</div>
+              <button onClick={load} style={{ background: "#075985", border: "none", color: "#7dd3fc", padding: "7px 14px", borderRadius: 6, cursor: "pointer", fontSize: 12, fontFamily: "inherit", width: "100%" }}>
+                🔄 새로고침
+              </button>
+            </div>
+          </div>
+          <div style={{ flex: 1, background: "#f0f9ff", padding: 32, overflowY: "auto", minWidth: 0 }}>
+            {loading && <div style={{ marginBottom: 16, padding: "10px 16px", background: "#e0f2fe", borderRadius: 8, fontSize: 13, color: "#0284c7" }}>⏳ 로딩 중...</div>}
+            {err && (
+              <div style={{ marginBottom: 16, padding: "12px 16px", background: "#fee2e2", borderRadius: 8, fontSize: 13, color: "#dc2626" }}>
+                ⚠️ DB 연결 오류: {err}<br />
+                <span style={{ fontSize: 12 }}>src/config.js 의 SUPABASE_URL 과 SUPABASE_ANON_KEY 를 확인하세요.</span>
+              </div>
+            )}
+            {pages[page]}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
