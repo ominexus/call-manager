@@ -435,26 +435,29 @@ function MapsPage({ data, week, onRefresh }) {
   const [filterCaller, setFilterCaller] = useState("");
 
   const copyFromLastWeek = async () => {
-    if (maps.length > 0 && !confirm("이미 이번 주 배정 데이터가 있습니다. 지난주 데이터를 추가로 가져오시겠습니까?")) return;
+    if (maps.length > 0 && !confirm("이미 이번 주 배정 데이터가 있습니다. 이전 데이터를 추가로 가져오시겠습니까?")) return;
     
     setSaving(true);
     try {
-      const lastWeek = getISOWeek(new Date(Date.now() - 7 * 86400000));
-      const prevMaps = await db("GET", `caller_receiver_map?select=caller_id,receiver_id&week_label=eq.${lastWeek}`);
+      // 가장 최근에 데이터가 있는 주차 찾기 (현재 주차보다 이전인 것 중 가장 큰 주차)
+      const lastAvailable = await db("GET", `caller_receiver_map?select=week_label&week_label=lt.${week}&order=week_label.desc&limit=1`);
       
-      if (prevMaps.length === 0) {
-        alert(`지난주(${lastWeek}) 배정 데이터가 없습니다.`);
+      if (lastAvailable.length === 0) {
+        alert("이전 배정 데이터가 존재하지 않습니다.");
       } else {
+        const targetWeek = lastAvailable[0].week_label;
+        const prevMaps = await db("GET", `caller_receiver_map?select=caller_id,receiver_id&week_label=eq.${targetWeek}`);
+        
         const existingKeys = new Set(maps.map(m => `${m.caller_id}-${m.receiver_id}`));
         const toAdd = prevMaps
           .filter(pm => !existingKeys.has(`${pm.caller_id}-${pm.receiver_id}`))
           .map(pm => ({ ...pm, week_label: week }));
 
         if (toAdd.length === 0) {
-          alert("추가할 새로운 데이터가 없습니다 (모든 데이터가 이미 배정됨).");
+          alert(`가장 최근인 ${targetWeek}의 데이터가 이미 모두 배정되어 있습니다.`);
         } else {
           await db("POST", "caller_receiver_map", toAdd);
-          alert(`지난주(${lastWeek})로부터 ${toAdd.length}개의 배정 데이터를 가져왔습니다.`);
+          alert(`${targetWeek}로부터 ${toAdd.length}개의 배정 데이터를 가져왔습니다.`);
           onRefresh();
         }
       }
