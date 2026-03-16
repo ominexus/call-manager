@@ -434,6 +434,36 @@ function MapsPage({ data, week, onRefresh }) {
   const [saving, setSaving] = useState(false);
   const [filterCaller, setFilterCaller] = useState("");
 
+  const copyFromLastWeek = async () => {
+    if (maps.length > 0 && !confirm("이미 이번 주 배정 데이터가 있습니다. 지난주 데이터를 추가로 가져오시겠습니까?")) return;
+    
+    setSaving(true);
+    try {
+      const lastWeek = getISOWeek(new Date(Date.now() - 7 * 86400000));
+      const prevMaps = await db("GET", `caller_receiver_map?select=caller_id,receiver_id&week_label=eq.${lastWeek}`);
+      
+      if (prevMaps.length === 0) {
+        alert(`지난주(${lastWeek}) 배정 데이터가 없습니다.`);
+      } else {
+        const existingKeys = new Set(maps.map(m => `${m.caller_id}-${m.receiver_id}`));
+        const toAdd = prevMaps
+          .filter(pm => !existingKeys.has(`${pm.caller_id}-${pm.receiver_id}`))
+          .map(pm => ({ ...pm, week_label: week }));
+
+        if (toAdd.length === 0) {
+          alert("추가할 새로운 데이터가 없습니다 (모든 데이터가 이미 배정됨).");
+        } else {
+          await db("POST", "caller_receiver_map", toAdd);
+          alert(`지난주(${lastWeek})로부터 ${toAdd.length}개의 배정 데이터를 가져왔습니다.`);
+          onRefresh();
+        }
+      }
+    } catch (e) {
+      alert("데이터를 가져오는 중 오류가 발생했습니다: " + e.message);
+    }
+    setSaving(false);
+  };
+
   const save = async () => {
     if (!form.caller_id || !form.receiver_id) return alert("담당자와 대상자를 모두 선택하세요.");
     setSaving(true);
@@ -460,7 +490,10 @@ function MapsPage({ data, week, onRefresh }) {
     <div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
         <h2 style={{ fontSize: 20, fontWeight: 700, color: "#0f172a" }}>주간 배정</h2>
-        <button onClick={() => setModal(true)} style={btnStyle("primary")}>+ 추가</button>
+        <div style={{ display: "flex", gap: 8 }}>
+          <button onClick={copyFromLastWeek} disabled={saving} style={btnStyle("ghost")}>📋 지난주 복사</button>
+          <button onClick={() => setModal(true)} style={btnStyle("primary")}>+ 추가</button>
+        </div>
       </div>
       <div style={{ fontSize: 13, color: "#64748b", marginBottom: 16 }}>{week}</div>
 
